@@ -112,7 +112,7 @@ void subdivide(QuadNode* n, RGBPixel* pixels)
     {
         for (int y=n->y;y<n->width;y++)
         {
-            int index = x(n->width)+y;
+            int index = x*(n->width)+y;
             int corPixel = pixels[index].r;
             corPixel+=pixels[index].g;
             corPixel+=pixels[index].b;
@@ -120,7 +120,7 @@ void subdivide(QuadNode* n, RGBPixel* pixels)
             corMedia+=corPixel;
         }
     }
-    corMedia/=(n->width)(n->height);
+    corMedia /= (n->height)*(n->width);
 
     //histograma
     int* histograma = calloc(256, sizeof(*histograma));
