@@ -1,6 +1,7 @@
 #include "quadtree.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #ifdef __APPLE__
 #include <OpenGL/gl.h>
@@ -10,6 +11,8 @@
 
 unsigned int first = 1;
 char desenhaBorda = 1;
+unsigned char** intensidades;
+float erroMinimo;
 
 QuadNode* newNode(int x, int y, int width, int height)
 {
@@ -37,6 +40,24 @@ QuadNode* geraQuadtree(Img* pic, float minError)
     int width = pic->width;
     int height = pic->height;
 
+    erroMinimo = minError;
+
+    intensidades = malloc(height * sizeof(unsigned char*));
+    for(int i=0; i<height; i++)
+        intensidades[i] = malloc(width * sizeof(unsigned char));
+
+    for (int x=0;x<height;x++)
+    {
+        for (int y=0;y<width;y++)
+        {
+            intensidades[x][y] = (0.3 * pixels[x][y].r) + (0.59 * pixels[x][y].g) + (0.11 * pixels[x][y].b);
+        }
+    }
+
+    QuadNode* raiz = newNode(0,0,width,height);
+    
+    subdivide(raiz, &pixels[0][0]);
+
     //////////////////////////////////////////////////////////////////////////
     // Implemente aqui o algoritmo que gera a quadtree, retornando o nodo raiz
     //////////////////////////////////////////////////////////////////////////
@@ -44,7 +65,7 @@ QuadNode* geraQuadtree(Img* pic, float minError)
 // COMENTE a linha abaixo quando seu algoritmo ja estiver funcionando
 // Caso contrario, ele ira gerar uma arvore de teste com 3 nodos
 
-#define DEMO
+//#define DEMO
 #ifdef DEMO
 
     /************************************************************/
@@ -81,6 +102,55 @@ QuadNode* geraQuadtree(Img* pic, float minError)
 #endif
     // Finalmente, retorna a raiz da árvore
     return raiz;
+}
+
+void subdivide(QuadNode* n, RGBPixel* pixels)
+{
+
+    //calculo da intensidade média da região
+    int intensidadeMedia=0;
+    for (int x=0;x<256;x++)
+    {
+        intensidadeMedia += x * histograma[x];
+    }
+    intensidadeMedia/=(n->width)*(n->height);
+
+    //calculo do nível de erro da região
+    int erro = 0;
+    for (int x=n->x;x<n->height;x++)
+    {
+        for (int y=n->y;y<n->width;y++)
+        {
+            int dif = intensidades[x][y] - intensidadeMedia;
+            dif*=dif;
+            dif+=erro;
+        }
+    }
+    erro*=1/(n->width)*(n->height);
+    erro = sqrt(erro);
+
+    //compara erro com o erro minimo
+    if (erro<erroMinimo)
+    {
+        n->status = CHEIO;
+        return;
+    }
+    else
+    {
+        n->status = PARCIAL;
+        int halfHeight = (n->height)/2;
+        int halfWidth = (n->width)/2;
+        n->NW = newNode(0,0,halfWidth,halfHeight);
+        n->NE = newNode(halfWidth,0,n->width,halfHeight);
+        n->SW = newNode(0,halfHeight,halfWidth,n->height);
+        n->SE = newNode(halfWidth,halfHeight,n->width,n->height);
+        
+        subdivide(n->NW,pixels);
+        subdivide(n->NE,pixels);
+        subdivide(n->SW,pixels);
+        subdivide(n->SE,pixels);
+    }
+    return;
 }
 
 // Limpa a memória ocupada pela árvore
@@ -170,4 +240,3 @@ void drawNode(QuadNode* n)
     }
     // Nodos vazios não precisam ser desenhados... nem armazenados!
 }
-
