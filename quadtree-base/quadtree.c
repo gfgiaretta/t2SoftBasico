@@ -106,7 +106,33 @@ QuadNode* geraQuadtree(Img* pic, float minError)
 
 void subdivide(QuadNode* n, RGBPixel* pixels)
 {
+    // cor média
+    int corMedia = 0;
+    for (int x=n->x;x<n->height;x++)
+    {
+        for (int y=n->y;y<n->width;y++)
+        {
+            int index = x(n->width)+y;
+            int corPixel = pixels[index].r;
+            corPixel+=pixels[index].g;
+            corPixel+=pixels[index].b;
+            corPixel/=3;
+            corMedia+=corPixel;
+        }
+    }
+    corMedia/=(n->width)(n->height);
 
+    //histograma
+    int* histograma = calloc(256, sizeof(*histograma));
+    for (int x=n->x;x<n->height;x++)
+    {
+        for (int y=n->y;y<n->width;y++)
+        {
+            int tom = intensidades[x][y];
+            histograma[tom]++;
+        }
+    }
+    
     //calculo da intensidade média da região
     int intensidadeMedia=0;
     for (int x=0;x<256;x++)
