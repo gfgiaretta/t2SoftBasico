@@ -13,6 +13,9 @@ unsigned int first = 1;
 char desenhaBorda = 1;
 unsigned char** intensidades;
 float erroMinimo;
+int globalWidth;
+
+void subdivide(QuadNode* n, RGBPixel* pixels);
 
 QuadNode* newNode(int x, int y, int width, int height)
 {
@@ -39,6 +42,8 @@ QuadNode* geraQuadtree(Img* pic, float minError)
 
     int width = pic->width;
     int height = pic->height;
+
+    globalWidth = width;
 
     erroMinimo = minError;
 
@@ -100,6 +105,11 @@ QuadNode* geraQuadtree(Img* pic, float minError)
     nw->NW = nw2;
 
 #endif
+    for(int x=0;x<pic->height;x++)
+    {
+        free(intensidades[x]);
+    }
+    free(intensidades);
     // Finalmente, retorna a raiz da árvore
     return raiz;
 }
@@ -107,56 +117,67 @@ QuadNode* geraQuadtree(Img* pic, float minError)
 void subdivide(QuadNode* n, RGBPixel* pixels)
 {
     // cor média
-    int corMedia = 0;
-    for (int x=n->x;x<n->height;x++)
+    long long red = 0;
+    long long green = 0;
+    long long blue = 0;
+    for (int y=n->y;y<n->y+n->height;y++)
     {
-        for (int y=n->y;y<n->width;y++)
+        for (int x=n->x;x<(n->x)+n->width;x++)
         {
-            int index = x*(n->width)+y;
-            int corPixel = pixels[index].r;
-            corPixel+=pixels[index].g;
-            corPixel+=pixels[index].b;
-            corPixel/=3;
-            corMedia+=corPixel;
+            int index = y * globalWidth + x;
+            red += pixels[index].r;
+            green += pixels[index].g;
+            blue += pixels[index].b;
         }
     }
-    corMedia /= (n->height)*(n->width);
+    int size = (n->height)*(n->width);
+    red/=size;
+    green/=size;
+    blue/=size;
+    n->color[0] = red;
+    n->color[1] = green;
+    n->color[2] = blue;
 
     //histograma
     int* histograma = calloc(256, sizeof(*histograma));
-    for (int x=n->x;x<n->height;x++)
+    for (int y=n->y;y<n->y+n->height;y++)
     {
-        for (int y=n->y;y<n->width;y++)
+        for (int x=n->x;x<(n->x)+n->width;x++)
         {
-            int tom = intensidades[x][y];
+            int tom = intensidades[y][x];
             histograma[tom]++;
         }
     }
     
     //calculo da intensidade média da região
-    int intensidadeMedia=0;
+    double intensidadeMedia=0;
     for (int x=0;x<256;x++)
     {
         intensidadeMedia += x * histograma[x];
     }
     intensidadeMedia/=(n->width)*(n->height);
 
+    free(histograma);
+
     //calculo do nível de erro da região
-    int erro = 0;
-    for (int x=n->x;x<n->height;x++)
+    double erro = 0;
+    for (int y=n->y;y<n->y+n->height;y++)
     {
-        for (int y=n->y;y<n->width;y++)
+        for (int x=n->x;x<(n->x)+n->width;x++)
         {
-            int dif = intensidades[x][y] - intensidadeMedia;
+            double dif = intensidades[y][x] - intensidadeMedia;
             dif*=dif;
-            dif+=erro;
+            erro+=dif;
         }
     }
-    erro*=1/(n->width)*(n->height);
+    int pixCount = (n->width)*(n->height);
+    double temp = 1;
+    temp/=pixCount;
+    erro*=temp;
     erro = sqrt(erro);
 
     //compara erro com o erro minimo
-    if (erro<erroMinimo)
+    if ((erro<erroMinimo)||(n->width<=1||n->height<=1))
     {
         n->status = CHEIO;
         return;
@@ -166,14 +187,21 @@ void subdivide(QuadNode* n, RGBPixel* pixels)
         n->status = PARCIAL;
         int halfHeight = (n->height)/2;
         int halfWidth = (n->width)/2;
-        n->NW = newNode(0,0,halfWidth,halfHeight);
-        n->NE = newNode(halfWidth,0,n->width,halfHeight);
-        n->SW = newNode(0,halfHeight,halfWidth,n->height);
-        n->SE = newNode(halfWidth,halfHeight,n->width,n->height);
-        
+
+        QuadNode* nw = newNode(n->x,n->y,halfWidth,halfHeight);
+        n->NW = nw;
         subdivide(n->NW,pixels);
+
+        QuadNode* ne = newNode(n->x+halfWidth,n->y,halfWidth,halfHeight);
+        n->NE = ne;
         subdivide(n->NE,pixels);
+
+        QuadNode* sw = newNode(n->x,n->y+halfHeight,halfWidth,halfHeight);
+        n->SW = sw;
         subdivide(n->SW,pixels);
+
+        QuadNode* se = newNode(n->x+halfWidth,n->y+halfHeight,halfWidth,halfHeight);
+        n->SE = se;
         subdivide(n->SE,pixels);
     }
     return;
